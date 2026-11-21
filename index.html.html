@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kitsune Shrine Arcade</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+    * { box-sizing: border-box; user-select: none; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #070913;
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+    .game-btn {
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+    }
+    .game-btn:hover { filter: brightness(1.08); }
+    .game-btn:active { transform: scale(0.95); }
+  </style>
+</head>
+<body>
+  <!-- Top HUD Bar -->
+  <div id="topHud" class="fixed top-0 left-0 right-0 z-20 flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-950/85 backdrop-blur border-b border-orange-500/30">
+    <div class="flex flex-wrap items-center gap-1.5">
+      <button onclick="setMode('hub')" id="btn-hub" class="game-btn px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-600 text-white shadow">Shrine Hub</button>
+      <button onclick="setMode('fighting')" id="btn-fighting" class="game-btn px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-orange-200">Foxfire Fighting</button>
+      <button onclick="setMode('survival')" id="btn-survival" class="game-btn px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-indigo-200">Kitsune Survival</button>
+      <button onclick="setMode('jet')" id="btn-jet" class="game-btn px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-cyan-200">Astral Jet</button>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 text-xs font-bold">
+      <span id="statHp" class="px-2.5 py-1 rounded-lg bg-rose-950/80 border border-rose-500/40 text-rose-300">HP 100</span>
+      <span id="statKills" class="px-2.5 py-1 rounded-lg bg-orange-950/80 border border-orange-500/40 text-orange-300">Kills 0 (Boss @ 10)</span>
+      <span id="statShards" class="px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-500/40 text-sky-300">Shards 100000000</span>
+      <button onclick="openModal('gacha')" class="game-btn px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white shadow">Fruit Gacha (10)</button>
+      <button onclick="openModal('fruits')" class="game-btn px-2.5 py-1.5 rounded-lg bg-pink-600 hover:bg-pink-500 text-white shadow">500 Fruits</button>
+      <button onclick="openModal('swords')" class="game-btn px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white shadow">500 Swords</button>
+      <button onclick="openModal('upgrades')" class="game-btn px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white shadow">Upgrade Shop</button>
+      <button onclick="downloadGameFile()" class="game-btn px-2.5 py-1.5 rounded-lg bg-lime-600 hover:bg-lime-500 text-slate-950 font-black shadow">⬇ Download index.html</button>
+    </div>
+  </div>
+
+  <!-- Toast Banner -->
+  <div id="toast" class="fixed top-14 left-1/2 -translate-x-1/2 z-30 pointer-events-none opacity-0 transition-opacity duration-200 px-4 py-2 rounded-xl bg-slate-900/95 border border-amber-400/60 text-amber-200 text-xs sm:text-sm font-bold shadow-xl"></div>
+
+  <!-- Bottom Action Bar -->
+  <div class="fixed bottom-3 left-1/2 -translate-x-1/2 z-20 flex flex-wrap items-center justify-center gap-2 px-3 py-2 rounded-2xl bg-slate-950/85 backdrop-blur border border-slate-700/70">
+    <button onclick="fireFoxfire()" class="game-btn px-3 py-1.5 rounded-xl text-xs font-extrabold bg-orange-600 text-white shadow">[J / Click] Foxfire</button>
+    <button onclick="useFruitSkill()" id="btnFruit" class="game-btn px-3 py-1.5 rounded-xl text-xs font-extrabold bg-fuchsia-600 text-white shadow">[K] Solar Fox Fruit</button>
+    <button onclick="useSwordSlash()" id="btnSword" class="game-btn px-3 py-1.5 rounded-xl text-xs font-extrabold bg-cyan-600 text-white shadow">[L] Ember Katana</button>
+    <button onclick="useDash()" class="game-btn px-3 py-1.5 rounded-xl text-xs font-extrabold bg-slate-700 text-slate-100 shadow">[Space] Dash</button>
+  </div>
+
+  <!-- On-Screen Touch D-Pad for Mobile / Mouse -->
+  <div class="fixed bottom-16 left-3 z-20 grid grid-cols-3 gap-1 w-28 h-28 sm:hidden">
+    <div></div>
+    <button onpointerdown="touch.up=true" onpointerup="touch.up=false" onpointerleave="touch.up=false" class="rounded-lg bg-slate-800/80 border border-slate-600 text-xs font-bold">▲</button>
+    <div></div>
+    <button onpointerdown="touch.left=true" onpointerup="touch.left=false" onpointerleave="touch.left=false" class="rounded-lg bg-slate-800/80 border border-slate-600 text-xs font-bold">◀</button>
+    <div class="rounded-lg bg-slate-900/60 flex items-center justify-center text-[10px] text-slate-400">🦊</div>
+    <button onpointerdown="touch.right=true" onpointerup="touch.right=false" onpointerleave="touch.right=false" class="rounded-lg bg-slate-800/80 border border-slate-600 text-xs font-bold">▶</button>
+    <div></div>
+    <button onpointerdown="touch.down=true" onpointerup="touch.down=false" onpointerleave="touch.down=false" class="rounded-lg bg-slate-800/80 border border-slate-600 text-xs font-bold">▼</button>
+    <div></div>
+  </div>
+
+  <!-- Gacha Modal -->
+  <div id="modal-gacha" class="hidden fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-lg rounded-2xl bg-slate-900 border border-purple-500/40 p-5 shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-black text-purple-300">Universal Fruit Gacha (500 Fruits)</h2>
+        <button onclick="closeModals()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs font-bold">Close</button>
+      </div>
+      <p class="text-xs text-slate-300 mb-3">Roll from all 500 Universal Fruits for 10 Shards. Equip any rolled fruit to change your [K] elemental blast!</p>
+      <div class="flex items-center justify-between gap-2 mb-4">
+        <span id="gachaShards" class="text-xs font-bold text-sky-300">Shards: 100000000</span>
+        <button onclick="rollFruit()" class="game-btn px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-xs font-black text-white shadow-lg">Roll Fruit (10 Shards)</button>
+      </div>
+      <div id="gachaResult" class="mb-3 p-3 rounded-xl bg-slate-950 border border-purple-500/30 text-xs font-bold text-amber-300 min-h-[42px] flex items-center">
+        Current Fruit: #1 Solar Fox Fruit
+      </div>
+      <div id="fruitList" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-52 overflow-y-auto pr-1"></div>
+    </div>
+  </div>
+
+  <!-- 500 Universal Fruits Shop Modal -->
+  <div id="modal-fruits" class="hidden fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl rounded-2xl bg-slate-900 border border-pink-500/40 p-5 shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-black text-pink-300">500 Universal Fruits Shop</h2>
+        <button onclick="closeModals()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs font-bold">Close</button>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <input id="fruitSearch" oninput="renderFruitShop()" type="text" placeholder="Search 500 universal fruits (#1..#500 or name)..." class="flex-1 min-w-[180px] px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-pink-400" />
+        <button onclick="unlockAllFruits()" class="game-btn px-3 py-1.5 rounded-xl bg-pink-600 text-xs font-bold text-white">Unlock All 500</button>
+      </div>
+      <div id="fruitShopGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1"></div>
+    </div>
+  </div>
+
+  <!-- 500 Universal Swords Modal -->
+  <div id="modal-swords" class="hidden fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl rounded-2xl bg-slate-900 border border-emerald-500/40 p-5 shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-black text-emerald-300">500 Universal Swords Shop</h2>
+        <button onclick="closeModals()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs font-bold">Close</button>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 mb-3">
+        <input id="swordSearch" oninput="renderSwords()" type="text" placeholder="Search 500 universal swords (#1..#500 or name)..." class="flex-1 min-w-[180px] px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-400" />
+        <button onclick="unlockAllSwords()" class="game-btn px-3 py-1.5 rounded-xl bg-emerald-600 text-xs font-bold text-white">Unlock All 500</button>
+      </div>
+      <div id="swordGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1"></div>
+    </div>
+  </div>
+
+  <!-- Upgrade Shop Modal -->
+  <div id="modal-upgrades" class="hidden fixed inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-lg rounded-2xl bg-slate-900 border border-amber-500/40 p-5 shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-black text-amber-300">Kitsune Upgrade Shop (Max Lv. 100)</h2>
+        <button onclick="closeModals()" class="px-2.5 py-1 rounded-lg bg-slate-800 text-xs font-bold">Close</button>
+      </div>
+      <p class="text-xs text-slate-300 mb-3">Spend Spirit Shards to permanently power up your Kitsune combat stats up to Level 100.</p>
+      <div id="upgradeList" class="space-y-2.5 max-h-72 overflow-y-auto pr-1"></div>
+    </div>
+  </div>
+
+  <!-- Main Game Canvas -->
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    // ---------- SOUND EFFECTS (WEB AUDIO API) ----------
+    let audioCtx = null;
+    function playSound(freq = 440, type = 'sine', duration = 0.12, gainVal = 0.08) {
+      try {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          audioCtx = new AudioContextClass();
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (err) {
+        // Ignore audio errors if blocked before user interaction
+      }
+    }
+
+    // ---------- DATA: 500 UNIVERSAL FRUITS & 500 UNIVERSAL SWORDS ----------
+    const FRUIT_PREFIXES = ['Solar Fox', 'Void Nebula', 'Starlight Nova', 'Celestial Kitsune', 'Astral Thunder', 'Cryo Comet', 'Eclipse Flame', 'Phantom Lotus', 'Cosmic Dragon', 'Spirit Prism', 'Infinity Sun', 'Hyperion Star', 'Aether Flare', 'Galactic Soul', 'Omega Mirage', 'Chrono Spark', 'Zenith Frost', 'Radiant Shrine', 'Nebula Tempest', 'Divine Tail'];
+    const FRUIT_SUFFIXES = ['Fruit', 'Orb', 'Core', 'Bloom', 'Essence', 'Seed', 'Crown', 'Relic', 'Heart', 'Lotus'];
+    const FRUIT_RARITIES = ['Universal', 'Mythic', 'Cosmic', 'Celestial', 'Astral', 'Transcendent', 'Divine'];
+    const FRUITS = Array.from({ length: 500 }, (_, idx) => {
+      const num = idx + 1;
+      const prefix = FRUIT_PREFIXES[idx % FRUIT_PREFIXES.length];
+      const suffix = FRUIT_SUFFIXES[Math.floor(idx / FRUIT_PREFIXES.length) % FRUIT_SUFFIXES.length];
+      const tier = Math.floor(idx / (FRUIT_PREFIXES.length * FRUIT_SUFFIXES.length));
+      const tierTag = tier > 0 ? ` MK-${tier + 1}` : '';
+      const rarity = FRUIT_RARITIES[idx % FRUIT_RARITIES.length];
+      const dmg = 35 + num * 4;
+      const cost = num === 1 ? 0 : 12 + num * 5;
+      const hue = (num * 29 + 15) % 360;
+      return {
+        id: num,
+        name: `#${num} ${prefix} ${suffix}${tierTag}`,
+        color: `hsl(${hue}, 92%, 64%)`,
+        dmg,
+        cost,
+        rarity
+      };
+    });
+
+    const SWORD_PREFIXES = ['Ember', 'Astral', 'Nebula', 'Kitsune', 'Phantom', 'Solar', 'Lunar', 'Void', 'Celestial', 'Storm', 'Infinity', 'Omega', 'Aether', 'Hyperion', 'Dragon', 'Eclipse', 'Zenith', 'Radiant', 'Chrono', 'Divine'];
+    const SWORD_TYPES = ['Katana', 'Blade', 'Fang', 'Cleaver', 'Edge', 'Saber', 'Glaive', 'Scythe', 'Odachi', 'Dagger', 'Rapier', 'Halberd', 'Claymore', 'Longsword', 'Zanbato'];
+    const SWORDS = Array.from({ length: 500 }, (_, idx) => {
+      const num = idx + 1;
+      const prefix = SWORD_PREFIXES[idx % SWORD_PREFIXES.length];
+      const kind = SWORD_TYPES[Math.floor(idx / SWORD_PREFIXES.length) % SWORD_TYPES.length];
+      const tier = Math.floor(idx / (SWORD_PREFIXES.length * SWORD_TYPES.length));
+      const tierTag = tier > 0 ? ` MK-${tier + 1}` : '';
+      const power = 24 + num * 4;
+      const cost = num === 1 ? 0 : 12 + num * 5;
+      const hue = (num * 37) % 360;
+      return {
+        id: num,
+        name: `#${num} ${prefix} ${kind}${tierTag}`,
+        power,
+        cost,
+        color: `hsl(${hue}, 90%, 62%)`
+      };
+    });
+
+    const UPGRADE_DEFS = [
+      { key: 'firePower', name: 'Foxfire & Blast Power', desc: '+8 damage to Foxfire, Fruit & Sword attacks', baseCost: 15, stepCost: 12, maxLv: 100 },
+      { key: 'vitality', name: 'Kitsune Vitality (Max HP)', desc: '+25 Max HP and heals +25 HP immediately', baseCost: 15, stepCost: 10, maxLv: 100 },
+      { key: 'agility', name: 'Spirit Agility (Move Speed)', desc: '+22 movement speed across all modes', baseCost: 15, stepCost: 12, maxLv: 100 },
+      { key: 'shardBoost', name: 'Astral Shard Blessing', desc: '+1 bonus Shard per collected pickup', baseCost: 20, stepCost: 15, maxLv: 100 }
+    ];
+
+    // ---------- GAME STATE ----------
+    const state = {
+      mode: 'hub', // 'hub' | 'fighting' | 'survival' | 'jet'
+      shards: 100000000,
+      ownedFruits: [1],
+      equippedFruit: 1,
+      ownedSwords: [1],
+      equippedSword: 1,
+      upgrades: { firePower: 0, vitality: 0, agility: 0, shardBoost: 0 },
+      kills: { fighting: 0, survival: 0, jet: 0 },
+      nextBossAt: { fighting: 10, survival: 10, jet: 10 },
+      bossActive: { fighting: false, survival: false, jet: false },
+      nightTimer: 30,
+      isNight: true,
+      player: {
+        x: 400, y: 300, vx: 0, vy: 0, r: 18,
+        hp: 100, maxHp: 100,
+        aimAngle: 0,
+        fireCd: 0, fruitCd: 0, swordCd: 0, dashCd: 0, dashTimer: 0,
+        invuln: 0, dead: false
+      },
+      entities: [],     // enemies & bosses
+      projectiles: [],  // player & enemy shots
+      slashes: [],      // sword arcs
+      particles: [],
+      pickups: [],
+      portals: [],
+      stars: Array.from({ length: 90 }, () => ({
+        x: Math.random(), y: Math.random(), s: 1 + Math.random() * 2.2, spd: 30 + Math.random() * 90
+      })),
+      spawnTimer: 0,
+      respawnBtn: null
+    };
+
+    // ---------- CANVAS & INPUT ----------
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const keys = {};
+    const touch = { up: false, down: false, left: false, right: false };
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      if (state.mode === 'hub') buildPortals();
+      clampPlayer();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    window.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      keys[k] = true;
+      if (k === 'j') fireFoxfire();
+      if (k === 'k') useFruitSkill();
+      if (k === 'l') useSwordSlash();
+      if (k === ' ') { e.preventDefault(); useDash(); }
+      if (k === 'r' && state.player.dead) revivePlayer();
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      state.player.aimAngle = Math.atan2(my - state.player.y, mx - state.player.x);
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      if (state.player.dead && state.respawnBtn) {
+        const b = state.respawnBtn;
+        if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+          revivePlayer();
+          return;
+        }
+      }
+      state.player.aimAngle = Math.atan2(my - state.player.y, mx - state.player.x);
+      fireFoxfire();
+    });
+
+    // ---------- UI HELPERS ----------
+    function downloadGameFile() {
+      const htmlContent = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'index.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Downloaded index.html! Check your Downloads folder!');
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('opacity-0');
+      el.classList.add('opacity-100');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.classList.remove('opacity-100');
+        el.classList.add('opacity-0');
+      }, 2200);
+    }
+
+    function syncHUD() {
+      const p = state.player;
+      document.getElementById('statHp').textContent = `HP ${Math.ceil(p.hp)}/${p.maxHp}`;
+      if (state.mode === 'hub') {
+        document.getElementById('statKills').textContent = 'Shrine Hub';
+      } else {
+        const k = state.kills[state.mode];
+        const nb = state.nextBossAt[state.mode];
+        document.getElementById('statKills').textContent = `Kills ${k} (Boss @ ${nb})`;
+      }
+      document.getElementById('statShards').textContent = `Shards ${state.shards}`;
+
+      const fruit = FRUITS.find(f => f.id === state.equippedFruit) || FRUITS[0];
+      const sword = SWORDS.find(s => s.id === state.equippedSword) || SWORDS[0];
+      document.getElementById('btnFruit').textContent = `[K] ${fruit.name}`;
+      document.getElementById('btnSword').textContent = `[L] ${sword.name}`;
+
+      ['hub', 'fighting', 'survival', 'jet'].forEach(m => {
+        const btn = document.getElementById('btn-' + m);
+        if (!btn) return;
+        if (m === state.mode) {
+          btn.className = 'game-btn px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 shadow';
+        } else {
+          btn.className = 'game-btn px-2.5 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200';
+        }
+      });
+    }
+
+    function openModal(which) {
+      closeModals();
+      if (which === 'gacha') {
+        document.getElementById('modal-gacha').classList.remove('hidden');
+        renderFruits();
+      } else if (which === 'fruits') {
+        document.getElementById('modal-fruits').classList.remove('hidden');
+        renderFruitShop();
+      } else if (which === 'swords') {
+        document.getElementById('modal-swords').classList.remove('hidden');
+        renderSwords();
+      } else if (which === 'upgrades') {
+        document.getElementById('modal-upgrades').classList.remove('hidden');
+        renderUpgrades();
+      }
+    }
+
+    function closeModals() {
+      document.getElementById('modal-gacha').classList.add('hidden');
+      document.getElementById('modal-fruits').classList.add('hidden');
+      document.getElementById('modal-swords').classList.add('hidden');
+      document.getElementById('modal-upgrades').classList.add('hidden');
+    }
+
+    // ---------- FRUIT GACHA, 50 FRUITS SHOP, 50 SWORDS SHOP & UPGRADE SHOP ----------
+    function rollFruit() {
+      if (state.shards < 10) {
+        showToast('Need 10 Shards to roll a Universal Fruit!');
+        return;
+      }
+      state.shards -= 10;
+      const roll = FRUITS[Math.floor(Math.random() * FRUITS.length)];
+      if (!state.ownedFruits.includes(roll.id)) {
+        state.ownedFruits.push(roll.id);
+      }
+      state.equippedFruit = roll.id;
+      playSound(660, 'triangle', 0.22, 0.1);
+      document.getElementById('gachaResult').textContent = `Rolled & Equipped: ${roll.name} (${roll.rarity} • DMG ${roll.dmg})`;
+      renderFruits();
+      if (!document.getElementById('modal-fruits').classList.contains('hidden')) renderFruitShop();
+      syncHUD();
+    }
+
+    function equipFruit(id) {
+      if (!state.ownedFruits.includes(id)) return;
+      state.equippedFruit = id;
+      const f = FRUITS.find(x => x.id === id);
+      document.getElementById('gachaResult').textContent = `Equipped: ${f.name} (${f.rarity} • DMG ${f.dmg})`;
+      renderFruits();
+      renderFruitShop();
+      syncHUD();
+    }
+
+    function selectFruitShop(id) {
+      const f = FRUITS.find(x => x.id === id);
+      if (!f) return;
+      if (state.ownedFruits.includes(id)) {
+        equipFruit(id);
+        playSound(540, 'triangle', 0.12, 0.08);
+      } else {
+        if (state.shards < f.cost) {
+          showToast(`Need ${f.cost} Shards for ${f.name}!`);
+          return;
+        }
+        state.shards -= f.cost;
+        state.ownedFruits.push(id);
+        equipFruit(id);
+        playSound(760, 'sine', 0.18, 0.09);
+      }
+    }
+
+    function unlockAllFruits() {
+      state.ownedFruits = FRUITS.map(f => f.id);
+      playSound(880, 'triangle', 0.22, 0.1);
+      showToast('Unlocked all 500 Universal Fruits!');
+      renderFruitShop();
+      renderFruits();
+      syncHUD();
+    }
+
+    function renderFruits() {
+      document.getElementById('gachaShards').textContent = `Shards: ${state.shards}`;
+      const list = document.getElementById('fruitList');
+      const displayFruits = FRUITS.slice(0, 120);
+      list.innerHTML = displayFruits.map(f => {
+        const owned = state.ownedFruits.includes(f.id);
+        const eq = state.equippedFruit === f.id;
+        return `
+          <button onclick="${owned ? `equipFruit(${f.id})` : ''}" class="p-2.5 rounded-xl border text-left text-xs ${
+            eq ? 'bg-purple-900/70 border-amber-400' : owned ? 'bg-slate-800 border-purple-500/40 hover:bg-slate-700' : 'bg-slate-950/70 border-slate-800 opacity-55'
+          }">
+            <div class="font-extrabold truncate" style="color:${f.color}">${f.name}</div>
+            <div class="text-[11px] text-slate-300">${f.rarity} • DMG ${f.dmg}</div>
+            <div class="text-[10px] mt-1 font-bold text-amber-300">${eq ? 'EQUIPPED' : owned ? 'Click to Equip' : 'Roll or Buy in Fruit Shop'}</div>
+          </button>
+        `;
+      }).join('') + `<div class="col-span-full text-center text-[11px] text-slate-400 py-1">Showing #1–#120 here. All 500 Fruits can be rolled in Gacha or browsed in the 500 Fruits Shop!</div>`;
+    }
+
+    function renderFruitShop() {
+      const q = (document.getElementById('fruitSearch').value || '').toLowerCase().trim();
+      const grid = document.getElementById('fruitShopGrid');
+      const filtered = FRUITS.filter(f => !q || f.name.toLowerCase().includes(q) || f.rarity.toLowerCase().includes(q) || String(f.id) === q);
+      const shown = filtered.slice(0, 160);
+      grid.innerHTML = shown.map(f => {
+        const owned = state.ownedFruits.includes(f.id);
+        const eq = state.equippedFruit === f.id;
+        return `
+          <button onclick="selectFruitShop(${f.id})" class="p-2 rounded-xl border text-left text-xs ${
+            eq ? 'bg-pink-900/70 border-amber-400' : owned ? 'bg-slate-800 border-pink-500/40 hover:bg-slate-700' : 'bg-slate-950 border-slate-800 hover:border-slate-600'
+          }">
+            <div class="font-extrabold truncate" style="color:${f.color}">${f.name}</div>
+            <div class="text-[11px] text-slate-300">${f.rarity} • DMG ${f.dmg}</div>
+            <div class="text-[10px] mt-0.5 font-bold ${eq ? 'text-amber-300' : owned ? 'text-pink-300' : 'text-sky-300'}">
+              ${eq ? 'EQUIPPED' : owned ? 'Equip' : `Buy (${f.cost} Shards)`}
+            </div>
+          </button>
+        `;
+      }).join('') + (filtered.length > shown.length ? `<div class="col-span-full text-center text-[11px] text-slate-400 py-1">Showing ${shown.length} of ${filtered.length} fruits — type #1 to #500 in search to jump directly!</div>` : '');
+    }
+
+    function renderSwords() {
+      const q = (document.getElementById('swordSearch').value || '').toLowerCase().trim();
+      const grid = document.getElementById('swordGrid');
+      const filtered = SWORDS.filter(s => !q || s.name.toLowerCase().includes(q) || String(s.id) === q);
+      const shown = filtered.slice(0, 160);
+      grid.innerHTML = shown.map(s => {
+        const owned = state.ownedSwords.includes(s.id);
+        const eq = state.equippedSword === s.id;
+        return `
+          <button onclick="selectSword(${s.id})" class="p-2 rounded-xl border text-left text-xs ${
+            eq ? 'bg-emerald-900/70 border-amber-400' : owned ? 'bg-slate-800 border-emerald-500/40 hover:bg-slate-700' : 'bg-slate-950 border-slate-800 hover:border-slate-600'
+          }">
+            <div class="font-extrabold truncate" style="color:${s.color}">${s.name}</div>
+            <div class="text-[11px] text-slate-300">Power ${s.power}</div>
+            <div class="text-[10px] mt-0.5 font-bold ${eq ? 'text-amber-300' : owned ? 'text-emerald-300' : 'text-sky-300'}">
+              ${eq ? 'EQUIPPED' : owned ? 'Equip' : `Buy (${s.cost} Shards)`}
+            </div>
+          </button>
+        `;
+      }).join('') + (filtered.length > shown.length ? `<div class="col-span-full text-center text-[11px] text-slate-400 py-1">Showing ${shown.length} of ${filtered.length} swords — type #1 to #500 in search to jump directly!</div>` : '');
+    }
+
+    function selectSword(id) {
+      const s = SWORDS.find(x => x.id === id);
+      if (!s) return;
+      if (state.ownedSwords.includes(id)) {
+        state.equippedSword = id;
+        playSound(520, 'triangle', 0.12, 0.08);
+      } else {
+        if (state.shards < s.cost) {
+          showToast(`Need ${s.cost} Shards for ${s.name}!`);
+          return;
+        }
+        state.shards -= s.cost;
+        state.ownedSwords.push(id);
+        state.equippedSword = id;
+        playSound(740, 'sine', 0.18, 0.09);
+      }
+      renderSwords();
+      syncHUD();
+    }
+
+    function unlockAllSwords() {
+      state.ownedSwords = SWORDS.map(s => s.id);
+      playSound(880, 'triangle', 0.22, 0.1);
+      showToast('Unlocked all 500 Universal Swords!');
+      renderSwords();
+      syncHUD();
+    }
+
+    function getUpgradeCost(def, lv) {
+      return def.baseCost + lv * def.stepCost;
+    }
+
+    function buyUpgrade(key) {
+      const def = UPGRADE_DEFS.find(u => u.key === key);
+      if (!def) return;
+      const lv = state.upgrades[key] || 0;
+      if (lv >= def.maxLv) {
+        showToast(`${def.name} is already MAX level!`);
+        return;
+      }
+      const cost = getUpgradeCost(def, lv);
+      if (state.shards < cost) {
+        showToast(`Need ${cost} Shards for ${def.name}!`);
+        return;
+      }
+      state.shards -= cost;
+      state.upgrades[key] = lv + 1;
+
+      if (key === 'vitality') {
+        state.player.maxHp += 25;
+        state.player.hp = Math.min(state.player.maxHp, state.player.hp + 25);
+      }
+
+      playSound(690, 'triangle', 0.16, 0.09);
+      showToast(`Upgraded ${def.name} to Lv.${lv + 1}!`);
+      renderUpgrades();
+      syncHUD();
+    }
+
+    function renderUpgrades() {
+      const box = document.getElementById('upgradeList');
+      box.innerHTML = UPGRADE_DEFS.map(def => {
+        const lv = state.upgrades[def.key] || 0;
+        const maxed = lv >= def.maxLv;
+        const cost = getUpgradeCost(def, lv);
+        return `
+          <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
+            <div>
+              <div class="text-xs font-extrabold text-amber-300">${def.name} <span class="text-slate-400">(Lv.${lv}/${def.maxLv})</span></div>
+              <div class="text-[11px] text-slate-300">${def.desc}</div>
+            </div>
+            <button onclick="buyUpgrade('${def.key}')" ${maxed ? 'disabled' : ''} class="game-btn shrink-0 px-3 py-2 rounded-xl text-xs font-black ${
+              maxed ? 'bg-slate-800 text-slate-500' : 'bg-amber-500 text-slate-950 shadow'
+            }">
+              ${maxed ? 'MAX' : `${cost} Shards`}
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ---------- MODE SWITCHING & SPAWNING ----------
+    function buildPortals() {
+      const w = canvas.width;
+      const h = canvas.height;
+      state.portals = [
+        { id: 'fighting', label: 'Foxfire Fighting', color: '#fb923c', x: w * 0.24, y: h * 0.45, r: 42 },
+        { id: 'survival', label: 'Kitsune Survival (30s Night)', color: '#a855f7', x: w * 0.5, y: h * 0.34, r: 42 },
+        { id: 'jet', label: 'Astral Jet Space', color: '#22d3ee', x: w * 0.76, y: h * 0.45, r: 42 }
+      ];
+    }
+
+    function setMode(newMode) {
+      state.mode = newMode;
+      state.entities = [];
+      state.projectiles = [];
+      state.slashes = [];
+      state.particles = [];
+      state.pickups = [];
+      state.spawnTimer = 0.4;
+
+      const p = state.player;
+      p.x = canvas.width * 0.5;
+      p.y = canvas.height * 0.68;
+      p.vx = 0;
+      p.vy = 0;
+      p.hp = p.maxHp;
+      p.dead = false;
+      p.invuln = 0.6;
+
+      if (newMode === 'hub') {
+        buildPortals();
+        showToast('Entered Kitsune Shrine Hub — Walk into a portal or click top buttons!');
+      } else if (newMode === 'fighting') {
+        state.bossActive.fighting = false;
+        spawnEnemy(false);
+        showToast('Foxfire Fighting! Boss spawns every 10 kills.');
+      } else if (newMode === 'survival') {
+        state.bossActive.survival = false;
+        state.isNight = true;
+        state.nightTimer = 30;
+        spawnEnemy(false);
+        showToast('Kitsune Survival — 30s Night! Monsters burn at Day!');
+      } else if (newMode === 'jet') {
+        state.bossActive.jet = false;
+        spawnEnemy(false);
+        showToast('Astral Jet Fighter — Blast Astral Animals in space!');
+      }
+      syncHUD();
+    }
+
+    function revivePlayer() {
+      const p = state.player;
+      p.hp = p.maxHp;
+      p.dead = false;
+      p.invuln = 1.2;
+      p.x = canvas.width * 0.5;
+      p.y = canvas.height * 0.65;
+      p.vx = 0;
+      p.vy = 0;
+      showToast('Kitsune Revived!');
+      syncHUD();
+    }
+
+    function spawnEnemy(isBoss) {
+      const m = state.mode;
+      if (m === 'hub') return;
+
+      const animals = m === 'jet'
+        ? ['Astral Wolf', 'Nebula Serpent', 'Star Stag', 'Cosmic Tiger']
+        : ['Nebula Fox', 'Astral Bear', 'Void Panther', 'Star Owl'];
+      const name = isBoss
+        ? `BOSS: ${animals[Math.floor(Math.random() * animals.length)]} Sovereign`
+        : animals[Math.floor(Math.random() * animals.length)];
+
+      const x = 60 + Math.random() * Math.max(120, canvas.width - 120);
+      const y = m === 'jet' ? 70 : (Math.random() < 0.5 ? 70 : canvas.height - 90);
+
+      state.entities.push({
+        isBoss,
+        name,
+        x,
+        y,
+        vx: 0,
+        vy: 0,
+        r: isBoss ? 38 : 20,
+        hp: isBoss ? 360 : 65,
+        maxHp: isBoss ? 360 : 65,
+        speed: isBoss ? 95 : (m === 'jet' ? 115 : 130),
+        color: isBoss ? '#f43f5e' : (m === 'jet' ? '#38bdf8' : '#c084fc'),
+        shotCd: 1.2 + Math.random()
+      });
+    }
+
+    function checkBossSpawn() {
+      const m = state.mode;
+      if (m === 'hub') return;
+      if (!state.bossActive[m] && state.kills[m] >= state.nextBossAt[m]) {
+        state.bossActive[m] = true;
+        state.nextBossAt[m] += 10;
+        spawnEnemy(true);
+        playSound(150, 'sawtooth', 0.35, 0.12);
+        showToast('10 KILLS REACHED — BOSS SPAWNED!');
+      }
+    }
+
+    // ---------- COMBAT ACTIONS ----------
+    function fireFoxfire() {
+      if (state.player.dead) return;
+      const p = state.player;
+      if (p.fireCd > 0) return;
+      p.fireCd = 0.22;
+
+      const bonusDmg = (state.upgrades.firePower || 0) * 8;
+      const angle = state.mode === 'jet' ? -Math.PI / 2 : p.aimAngle;
+      const spd = 540;
+      state.projectiles.push({
+        fromPlayer: true,
+        x: p.x + Math.cos(angle) * 20,
+        y: p.y + Math.sin(angle) * 20,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        r: 7,
+        dmg: 24 + bonusDmg,
+        color: state.mode === 'jet' ? '#22d3ee' : '#fb923c',
+        life: 1.5
+      });
+      playSound(560, 'sine', 0.08, 0.06);
+    }
+
+    function useFruitSkill() {
+      if (state.player.dead) return;
+      const p = state.player;
+      if (p.fruitCd > 0) return;
+      p.fruitCd = 0.65;
+
+      const bonusDmg = (state.upgrades.firePower || 0) * 8;
+      const fruit = FRUITS.find(f => f.id === state.equippedFruit) || FRUITS[0];
+      const baseAngle = state.mode === 'jet' ? -Math.PI / 2 : p.aimAngle;
+      [-0.22, 0, 0.22].forEach(off => {
+        const a = baseAngle + off;
+        state.projectiles.push({
+          fromPlayer: true,
+          x: p.x + Math.cos(a) * 22,
+          y: p.y + Math.sin(a) * 22,
+          vx: Math.cos(a) * 480,
+          vy: Math.sin(a) * 480,
+          r: 11,
+          dmg: fruit.dmg + bonusDmg,
+          color: fruit.color,
+          life: 1.6
+        });
+      });
+      playSound(720, 'triangle', 0.16, 0.09);
+    }
+
+    function useSwordSlash() {
+      if (state.player.dead) return;
+      const p = state.player;
+      if (p.swordCd > 0) return;
+      p.swordCd = 0.35;
+
+      const bonusDmg = (state.upgrades.firePower || 0) * 8;
+      const sword = SWORDS.find(s => s.id === state.equippedSword) || SWORDS[0];
+      const angle = state.mode === 'jet' ? -Math.PI / 2 : p.aimAngle;
+      state.slashes.push({
+        x: p.x + Math.cos(angle) * 42,
+        y: p.y + Math.sin(angle) * 42,
+        angle,
+        r: 56,
+        dmg: sword.power + bonusDmg,
+        color: sword.color,
+        life: 0.18
+      });
+      playSound(390, 'sawtooth', 0.12, 0.07);
+    }
+
+    function useDash() {
+      if (state.player.dead) return;
+      const p = state.player;
+      if (p.dashCd > 0) return;
+      p.dashTimer = 0.18;
+      p.dashCd = 0.85;
+      p.invuln = Math.max(p.invuln, 0.25);
+
+      let dx = 0, dy = 0;
+      if (keys['w'] || keys['arrowup'] || touch.up) dy -= 1;
+      if (keys['s'] || keys['arrowdown'] || touch.down) dy += 1;
+      if (keys['a'] || keys['arrowleft'] || touch.left) dx -= 1;
+      if (keys['d'] || keys['arrowright'] || touch.right) dx += 1;
+      if (dx === 0 && dy === 0) {
+        dx = Math.cos(p.aimAngle);
+        dy = Math.sin(p.aimAngle);
+      } else {
+        const len = Math.hypot(dx, dy);
+        dx /= len; dy /= len;
+      }
+      p.vx = dx * 680;
+      p.vy = dy * 680;
+      playSound(820, 'sine', 0.1, 0.07);
+    }
+
+    function spawnBurst(x, y, color, count = 12) {
+      for (let i = 0; i < count; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const sp = 50 + Math.random() * 190;
+        state.particles.push({
+          x, y,
+          vx: Math.cos(a) * sp,
+          vy: Math.sin(a) * sp,
+          r: 2.5 + Math.random() * 3.5,
+          color,
+          life: 0.35 + Math.random() * 0.3
+        });
+      }
+    }
+
+    function damagePlayer(dmg) {
+      const p = state.player;
+      if (p.dead || p.invuln > 0) return;
+      p.hp = Math.max(0, p.hp - dmg);
+      p.invuln = 0.65;
+      spawnBurst(p.x, p.y, '#fb7185', 10);
+      playSound(140, 'square', 0.14, 0.08);
+      if (p.hp <= 0) {
+        p.dead = true;
+        showToast('Kitsune Defeated! Press [R] or click Respawn.');
+      }
+      syncHUD();
+    }
+
+    function clampPlayer() {
+      const p = state.player;
+      p.x = Math.max(24, Math.min(canvas.width - 24, p.x));
+      p.y = Math.max(54, Math.min(canvas.height - 64, p.y));
+    }
+
+    // ---------- UPDATE LOOP ----------
+    function update(dt) {
+      const p = state.player;
+      if (p.fireCd > 0) p.fireCd -= dt;
+      if (p.fruitCd > 0) p.fruitCd -= dt;
+      if (p.swordCd > 0) p.swordCd -= dt;
+      if (p.dashCd > 0) p.dashCd -= dt;
+      if (p.invuln > 0) p.invuln -= dt;
+
+      // Starfield scroll
+      for (const st of state.stars) {
+        const speedMult = state.mode === 'jet' ? 3.2 : 0.4;
+        st.y += st.spd * speedMult * dt / Math.max(1, canvas.height);
+        if (st.y > 1) { st.y = 0; st.x = Math.random(); }
+      }
+
+      // Player movement
+      if (!p.dead) {
+        let mx = 0, my = 0;
+        if (keys['w'] || keys['arrowup'] || touch.up) my -= 1;
+        if (keys['s'] || keys['arrowdown'] || touch.down) my += 1;
+        if (keys['a'] || keys['arrowleft'] || touch.left) mx -= 1;
+        if (keys['d'] || keys['arrowright'] || touch.right) mx += 1;
+        if (mx !== 0 || my !== 0) {
+          const len = Math.hypot(mx, my);
+          mx /= len; my /= len;
+          if (state.mode !== 'jet') {
+            p.aimAngle = Math.atan2(my, mx);
+          }
+        }
+
+        if (p.dashTimer > 0) {
+          p.dashTimer -= dt;
+        } else {
+          const moveSpd = 280 + (state.upgrades.agility || 0) * 22;
+          p.vx = mx * moveSpd;
+          p.vy = my * moveSpd;
+        }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        clampPlayer();
+      }
+
+      // Hub portal entry
+      if (state.mode === 'hub' && !p.dead) {
+        for (const portal of state.portals) {
+          if (Math.hypot(p.x - portal.x, p.y - portal.y) < p.r + portal.r - 4) {
+            setMode(portal.id);
+            return;
+          }
+        }
+      }
+
+      // Survival 30s night & dawn monster burn
+      if (state.mode === 'survival') {
+        state.nightTimer -= dt;
+        if (state.nightTimer <= 0) {
+          state.isNight = !state.isNight;
+          state.nightTimer = state.isNight ? 30 : 10;
+          if (!state.isNight) {
+            showToast('DAYTIME! Astral Nebula Monsters burn away in sunlight!');
+            for (const e of state.entities) {
+              spawnBurst(e.x, e.y, '#fde047', 16);
+              state.pickups.push({ x: e.x, y: e.y, val: 2, r: 7 });
+            }
+            state.entities = [];
+            state.bossActive.survival = false;
+            playSound(900, 'sine', 0.3, 0.09);
+          } else {
+            showToast('NIGHTFALL (30s)! Astral Nebula Animals return!');
+            playSound(220, 'sawtooth', 0.25, 0.08);
+          }
+        }
+      }
+
+      // Enemy spawning
+      if (state.mode !== 'hub') {
+        const canSpawn = state.mode !== 'survival' || state.isNight;
+        if (canSpawn) {
+          state.spawnTimer -= dt;
+          if (state.spawnTimer <= 0 && state.entities.length < 7) {
+            spawnEnemy(false);
+            state.spawnTimer = state.mode === 'jet' ? 1.15 : 1.35;
+          }
+        }
+      }
+
+      // Update enemies
+      for (let i = state.entities.length - 1; i >= 0; i--) {
+        const e = state.entities[i];
+        const dx = p.x - e.x;
+        const dy = p.y - e.y;
+        const dist = Math.hypot(dx, dy) || 1;
+
+        if (state.mode === 'jet') {
+          e.x += Math.sin(e.y * 0.03 + performance.now() * 0.002) * 80 * dt;
+          e.y += e.speed * 0.65 * dt;
+          if (e.y > canvas.height - 80) e.y = 70;
+        } else {
+          e.x += (dx / dist) * e.speed * dt;
+          e.y += (dy / dist) * e.speed * dt;
+        }
+
+        // Enemy shots
+        e.shotCd -= dt;
+        if (e.shotCd <= 0 && !p.dead) {
+          e.shotCd = e.isBoss ? 1.1 : 2.1;
+          const a = Math.atan2(dy, dx);
+          state.projectiles.push({
+            fromPlayer: false,
+            x: e.x, y: e.y,
+            vx: Math.cos(a) * 260,
+            vy: Math.sin(a) * 260,
+            r: e.isBoss ? 8 : 6,
+            dmg: e.isBoss ? 18 : 10,
+            color: '#f43f5e',
+            life: 2.5
+          });
+        }
+
+        // Contact damage
+        if (!p.dead && dist < p.r + e.r) {
+          damagePlayer(e.isBoss ? 16 : 9);
+        }
+
+        // Sword slash hit check
+        for (const sl of state.slashes) {
+          if (Math.hypot(e.x - sl.x, e.y - sl.y) < e.r + sl.r) {
+            e.hp -= sl.dmg * dt * 5;
+            spawnBurst(e.x, e.y, sl.color, 3);
+          }
+        }
+
+        if (e.hp <= 0) {
+          spawnBurst(e.x, e.y, e.color, e.isBoss ? 28 : 14);
+          const dropCount = e.isBoss ? 8 : 2;
+          for (let d = 0; d < dropCount; d++) {
+            state.pickups.push({
+              x: e.x + (Math.random() - 0.5) * 24,
+              y: e.y + (Math.random() - 0.5) * 24,
+              val: 2,
+              r: 7
+            });
+          }
+          state.kills[state.mode] += 1;
+          if (e.isBoss) state.bossActive[state.mode] = false;
+          state.entities.splice(i, 1);
+          playSound(310, 'triangle', 0.14, 0.08);
+          checkBossSpawn();
+          syncHUD();
+        }
+      }
+
+      // Update projectiles
+      for (let i = state.projectiles.length - 1; i >= 0; i--) {
+        const pr = state.projectiles[i];
+        pr.x += pr.vx * dt;
+        pr.y += pr.vy * dt;
+        pr.life -= dt;
+        if (pr.life <= 0 || pr.x < -30 || pr.x > canvas.width + 30 || pr.y < -30 || pr.y > canvas.height + 30) {
+          state.projectiles.splice(i, 1);
+          continue;
+        }
+
+        if (pr.fromPlayer) {
+          let hit = false;
+          for (const e of state.entities) {
+            if (Math.hypot(pr.x - e.x, pr.y - e.y) < pr.r + e.r) {
+              e.hp -= pr.dmg;
+              spawnBurst(pr.x, pr.y, pr.color, 6);
+              hit = true;
+              break;
+            }
+          }
+          if (hit) state.projectiles.splice(i, 1);
+        } else if (!p.dead && Math.hypot(pr.x - p.x, pr.y - p.y) < pr.r + p.r) {
+          damagePlayer(pr.dmg);
+          state.projectiles.splice(i, 1);
+        }
+      }
+
+      // Update slashes
+      for (let i = state.slashes.length - 1; i >= 0; i--) {
+        state.slashes[i].life -= dt;
+        if (state.slashes[i].life <= 0) state.slashes.splice(i, 1);
+      }
+
+      // Update pickups (magnetic shard collection)
+      for (let i = state.pickups.length - 1; i >= 0; i--) {
+        const pk = state.pickups[i];
+        const dx = p.x - pk.x;
+        const dy = p.y - pk.y;
+        const d = Math.hypot(dx, dy) || 1;
+        if (d < 150 && !p.dead) {
+          pk.x += (dx / d) * 320 * dt;
+          pk.y += (dy / d) * 320 * dt;
+        }
+        if (!p.dead && d < p.r + pk.r + 6) {
+          state.shards += pk.val + (state.upgrades.shardBoost || 0);
+          p.hp = Math.min(p.maxHp, p.hp + 2);
+          state.pickups.splice(i, 1);
+          playSound(780, 'sine', 0.07, 0.05);
+          syncHUD();
+        }
+      }
+
+      // Update particles
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const pt = state.particles[i];
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.life -= dt;
+        if (pt.life <= 0) state.particles.splice(i, 1);
+      }
+    }
+
+    // ---------- RENDER LOOP ----------
+    function draw() {
+      const w = canvas.width;
+      const h = canvas.height;
+
+      // Background by mode
+      if (state.mode === 'jet') {
+        ctx.fillStyle = '#040714';
+      } else if (state.mode === 'survival') {
+        ctx.fillStyle = state.isNight ? '#0b0920' : '#1e3a5f';
+      } else if (state.mode === 'fighting') {
+        ctx.fillStyle = '#180d14';
+      } else {
+        ctx.fillStyle = '#0c1222';
+      }
+      ctx.fillRect(0, 0, w, h);
+
+      // Stars
+      for (const st of state.stars) {
+        ctx.fillStyle = 'rgba(255,255,255,0.65)';
+        ctx.fillRect(st.x * w, st.y * h, st.s, st.s);
+      }
+
+      // Hub Portals
+      if (state.mode === 'hub') {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fde68a';
+        ctx.font = '900 26px Inter, sans-serif';
+        ctx.fillText('KITSUNE SHRINE HUB', w / 2, 108);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '600 13px Inter, sans-serif';
+        ctx.fillText('Move with WASD / Arrows to enter a portal, or unlock 500 Universal Fruits, 500 Swords & Lv.100 Upgrades above.', w / 2, 132);
+
+        for (const portal of state.portals) {
+          ctx.beginPath();
+          ctx.arc(portal.x, portal.y, portal.r, 0, Math.PI * 2);
+          ctx.fillStyle = portal.color + '33';
+          ctx.fill();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = portal.color;
+          ctx.stroke();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '800 13px Inter, sans-serif';
+          ctx.fillText(portal.label, portal.x, portal.y + portal.r + 20);
+        }
+        ctx.restore();
+      }
+
+      // Survival Night/Day Timer Badge
+      if (state.mode === 'survival') {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.font = '900 18px Inter, sans-serif';
+        ctx.fillStyle = state.isNight ? '#c084fc' : '#fde047';
+        ctx.fillText(
+          state.isNight
+            ? `NIGHTTIME: ${Math.ceil(state.nightTimer)}s left (Monsters burn at Day!)`
+            : `DAYTIME: ${Math.ceil(state.nightTimer)}s — Nebula Monsters Burned!`,
+          w / 2,
+          78
+        );
+        ctx.restore();
+      }
+
+      // Pickups
+      for (const pk of state.pickups) {
+        ctx.beginPath();
+        ctx.arc(pk.x, pk.y, pk.r, 0, Math.PI * 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fill();
+      }
+
+      // Enemies & Bosses
+      for (const e of state.entities) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+        ctx.fillStyle = e.color;
+        ctx.fill();
+        ctx.lineWidth = e.isBoss ? 4 : 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+
+        // HP Bar above enemy
+        const barW = e.isBoss ? 84 : 40;
+        const hpRatio = Math.max(0, e.hp / e.maxHp);
+        ctx.fillStyle = 'rgba(0,0,0,0.65)';
+        ctx.fillRect(e.x - barW / 2, e.y - e.r - 14, barW, 6);
+        ctx.fillStyle = e.isBoss ? '#f43f5e' : '#22c55e';
+        ctx.fillRect(e.x - barW / 2, e.y - e.r - 14, barW * hpRatio, 6);
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = e.isBoss ? '900 12px Inter, sans-serif' : '700 11px Inter, sans-serif';
+        ctx.fillText(e.name, e.x, e.y - e.r - 18);
+        ctx.restore();
+      }
+
+      // Projectiles
+      for (const pr of state.projectiles) {
+        ctx.beginPath();
+        ctx.arc(pr.x, pr.y, pr.r, 0, Math.PI * 2);
+        ctx.fillStyle = pr.color;
+        ctx.fill();
+      }
+
+      // Sword Slashes
+      for (const sl of state.slashes) {
+        ctx.save();
+        ctx.translate(sl.x, sl.y);
+        ctx.rotate(sl.angle);
+        ctx.strokeStyle = sl.color;
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.arc(0, 0, sl.r * 0.65, -0.9, 0.9);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Player (Kitsune or Astral Jet)
+      const p = state.player;
+      if (!p.dead) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        if (p.invuln > 0 && Math.floor(p.invuln * 20) % 2 === 0) {
+          ctx.globalAlpha = 0.55;
+        }
+        if (state.mode === 'jet') {
+          // Space Jet triangle + foxfire wings
+          ctx.fillStyle = '#22d3ee';
+          ctx.beginPath();
+          ctx.moveTo(0, -24);
+          ctx.lineTo(20, 18);
+          ctx.lineTo(0, 10);
+          ctx.lineTo(-20, 18);
+          ctx.closePath();
+          ctx.fill();
+        } else {
+          // Kitsune Fox Circle + Ears + Aim pointer
+          ctx.fillStyle = '#fb923c';
+          ctx.beginPath();
+          ctx.arc(0, 0, p.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = '#fff7ed';
+          ctx.stroke();
+
+          // Ears
+          ctx.fillStyle = '#ea580c';
+          ctx.beginPath();
+          ctx.moveTo(-12, -10); ctx.lineTo(-16, -25); ctx.lineTo(-3, -15);
+          ctx.moveTo(12, -10); ctx.lineTo(16, -25); ctx.lineTo(3, -15);
+          ctx.fill();
+
+          // Aim line
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(p.aimAngle) * 20, Math.sin(p.aimAngle) * 20);
+          ctx.lineTo(Math.cos(p.aimAngle) * 32, Math.sin(p.aimAngle) * 32);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // Particles
+      for (const pt of state.particles) {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+        ctx.fillStyle = pt.color;
+        ctx.fill();
+      }
+
+      // Respawn Overlay
+      if (p.dead) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.68)';
+        ctx.fillRect(0, 0, w, h);
+        const bw = 180, bh = 44;
+        const bx = w / 2 - bw / 2;
+        const by = h / 2 + 12;
+        state.respawnBtn = { x: bx, y: by, w: bw, h: bh };
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#fb7185';
+        ctx.font = '900 26px Inter, sans-serif';
+        ctx.fillText('KITSUNE DEFEATED', w / 2, h / 2 - 14);
+
+        ctx.fillStyle = '#ea580c';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 12);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 14px Inter, sans-serif';
+        ctx.fillText('Respawn [R]', w / 2, by + 27);
+        ctx.restore();
+      } else {
+        state.respawnBtn = null;
+      }
+    }
+
+    let lastTime = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+      update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    resizeCanvas();
+    setMode('hub');
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
